@@ -10,15 +10,14 @@
     ./hardware-configuration.nix
     
     # Hardware profile cho Lenovo Legion
-    inputs.nixos-hardware.nixosModules.lenovo-legion-15ach6h
+    # inputs.nixos-hardware.nixosModules.lenovo-legion-15ach6h
   ];
   
   # Ghi đè hostname để đảm bảo nhất quán
   networking.hostName = hostname;
   
-  # Cấu hình bổ sung cho Legion
-  
   # Quản lý năng lượng và nhiệt cho laptop gaming
+  services.power-profiles-daemon.enable = false;
   services.thermald.enable = true;
   services.tlp = {
     enable = true;
@@ -32,14 +31,24 @@
     };
   };
   
-  # Cấu hình Card đồ họa
-  hardware.opengl = {
+  # Cấu hình Card đồ họa - UPDATED to use hardware.graphics
+  hardware.graphics = {
     enable = true;
-    driSupport = true;
-    driSupport32Bit = true;
+    enable32Bit = true;
+    extraPackages = with pkgs; [
+      amdvlk
+      rocmPackages.clr
+      rocmPackages.clr.icd
+    ];
+    extraPackages32 = with pkgs.pkgsi686Linux; [
+      amdvlk
+    ];
   };
-  
-  # Hỗ trợ NVIDIA nếu có
+
+  boot.initrd.kernelModules = [ "amdgpu" "nvidia" ];
+  boot.kernelPackages = pkgs.linuxPackages;
+
+  # Hỗ trợ NVIDIA với offload mode ưu tiên hơn cấu hình từ nixos-hardware
   hardware.nvidia = {
     modesetting.enable = true;
     powerManagement.enable = true;
@@ -47,17 +56,25 @@
     open = false;
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
+    
+    # Add offload configuration with mkForce
+    prime = {
+      offload.enable = lib.mkForce true;  # Using mkForce to override nixos-hardware
+      amdgpuBusId = "PCI:6:0:0";  # Update with your actual values
+      nvidiaBusId = "PCI:1:0:0";  # Update with your actual values
+    };
   };
   
-  # Hỗ trợ AMD GPU
-  hardware.amdgpu = {
+  # Cấu hình Audio - FIXED conflicting settings
+  hardware.pulseaudio.enable = false;
+
+  services.pipewire = {
     enable = true;
-    opencl = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+    jack.enable = true;
   };
-  
-  # Cấu hình Audio
-  hardware.pulseaudio.enable = true;
-  hardware.pulseaudio.support32Bit = true;
   
   # Hỗ trợ Bluetooth
   hardware.bluetooth = {
@@ -68,6 +85,10 @@
   
   # Các gói đặc thù cho Legion
   environment.systemPackages = with pkgs; [
+    git
+    zsh
+    oh-my-zsh
+
     # Công cụ quản lý laptop
     powertop
     s-tui
@@ -79,19 +100,59 @@
     # Tiện ích Legion
     lm_sensors
     acpi
+  ];
+
+  # Cấu hình Zsh - FIXED enableCompletions issue
+  programs.zsh = {
+    enable = true;
+    autosuggestions.enable = true;
+    syntaxHighlighting.enable = true;
     
-    # Driver và công cụ
-    linuxKernel.packages.linux_zen.nvidia_x11
-    amdvlk
-  ];
-  
-  # Bật vulkan
-  hardware.opengl.extraPackages = with pkgs; [
-    amdvlk
-    rocm-opencl-icd
-    rocm-opencl-runtime
-  ];
-  
+    # Update oh-my-zsh to ohMyZsh (camelCase)
+    ohMyZsh = {
+      enable = true;
+      theme = "robbyrussell";
+      plugins = [ "git" "macos" "docker" "vscode" "npm" "yarn" ];
+    };
+    
+    # Shell aliases
+    shellAliases = {
+      ll = "eza -l --icons";
+      la = "eza -la --icons";
+      cat = "bat";
+      top = "htop";
+      g = "git";
+    };
+  };
+
+  # Environment variables in global configuration
+  environment.sessionVariables = {
+    EDITOR = "nvim";
+    VISUAL = "code";
+    PATH = "$HOME/.local/bin:$PATH";
+    HISTSIZE = "10000";
+    SAVEHIST = "10000";
+    LANG = "en_US.UTF-8";
+  };
+
+  # Shell initialization
+  environment.shellInit = ''
+    # FZF integration for all shells that support it
+    if [ -n "$(command -v fzf)" ]; then
+      if [ -n "$ZSH_VERSION" ]; then
+        source ${pkgs.fzf}/share/fzf/completion.zsh
+        source ${pkgs.fzf}/share/fzf/key-bindings.zsh
+      fi
+    fi
+  '';
+
+  # Welcome message
+  environment.interactiveShellInit = ''
+    if [ -n "$ZSH_VERSION" ]; then
+      echo "Welcome to your NixOS development environment, Mike!"
+    fi
+  '';
+
   # Hỗ trợ phần cứng
   services.xserver.videoDrivers = [ "amdgpu" "nvidia" ];
   
@@ -101,8 +162,8 @@
     variant = "";
   };
   
-  # Hỗ trợ cảm ứng (nếu có)
-  services.xserver.libinput = {
+  # UPDATED: Renamed from services.xserver.libinput to services.libinput
+  services.libinput = {
     enable = true;
     touchpad = {
       tapping = true;
@@ -121,15 +182,10 @@
     "udev.log_priority=3"
   ];
   
-  # Tắt IPv6 nếu gây lag trong game
-  # networking.enableIPv6 = false;
-  
   # Tăng hiệu suất mạng
   networking.networkmanager.wifi.powersave = false;
   
   # Các cài đặt bổ sung
-  programs.gamemode.enable = true;  # Tối ưu hiệu suất khi chơi game
-  services.system76-scheduler.enable = true;  # Quản lý CPU
-  
-  # Về sau nếu cần thêm cấu hình đặc thù cho Legion, thêm vào đây
+  programs.gamemode.enable = true;
+  services.system76-scheduler.enable = true;
 }

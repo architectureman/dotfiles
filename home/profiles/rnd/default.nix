@@ -7,15 +7,11 @@
 
   # Packages that should be installed to the user profile.
   home.packages = with pkgs; [
-    git
     gitbutler
     vscode
     ghostty
-    oh-my-zsh
     inputs.zen-browser.packages.${system}.default
   ];
-
-  programs.zsh.enable = true;
 
   # This value determines the home Manager release that your
   # configuration is compatible with. This helps avoid breakage

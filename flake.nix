@@ -26,10 +26,15 @@
       url = "github:nix-community/NixOS-WSL";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Apps
+    
+    # Zen-browser
+    zen-browser.url = "github:0xc000022070/zen-browser-flake";
   };
 
   outputs = { self, nixpkgs, nixpkgs-unstable, nixos-hardware, 
-              home-manager, darwin, nixos-wsl, ... }@inputs:
+              home-manager, darwin, nixos-wsl, zen-browser, ... }@inputs:
     let
       # Import thư viện tiện ích
       lib = import ./lib { inherit nixpkgs; };
